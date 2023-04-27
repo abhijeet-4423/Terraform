@@ -39,6 +39,11 @@ resource "aws_internet_gateway" "some_ig" {
   }
 }
 
+resource "aws_nat_gateway" "example" {
+  connectivity_type = "private"
+  subnet_id         = aws_subnet.some_private_subnet.id
+}
+
 resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.some_custom_vpc.id
 
@@ -57,9 +62,32 @@ resource "aws_route_table" "public_rt" {
   }
 }
 
+resource "aws_route_table" "example" {
+  vpc_id = aws_vpc.some_custome_vpc.id
+
+  route {
+    cidr_block = "10.0.2.0/24"
+    gateway_id = aws_nat_gateway.example.id
+  }
+
+  route {
+    ipv6_cidr_block        = "::/0"
+    egress_only_gateway_id = aws_egress_only_internet_gateway.example.id
+  }
+
+  tags = {
+    Name = "example"
+  }
+}
+
 resource "aws_route_table_association" "public_1_rt_a" {
   subnet_id      = aws_subnet.some_public_subnet.id
   route_table_id = aws_route_table.public_rt.id
+}
+
+resource "aws_route_table_association" "example" {
+  subnet_id      = aws_subnet.some_private_subnet.id
+  route_table_id = aws_route_table.example.id
 }
 
 resource "aws_security_group" "web_sg" {
@@ -92,18 +120,14 @@ resource "aws_instance" "web_instance" {
   instance_type = "t2.nano"
   key_name      = "MyKeyPair2"
 
-  subnet_id                   = aws_subnet.some_public_subnet.id
+  subnet_id                   = aws_subnet.some_private_subnet.id
   vpc_security_group_ids      = [aws_security_group.web_sg.id]
-  associate_public_ip_address = true
+  associate_public_ip_address = false
 
   user_data = <<-EOF
   #!/bin/bash -ex
 
-  amazon-linux-extras install nginx1 -y
-  echo "<h1>$(curl https://api.kanye.rest/?format=text)</h1>" >  /usr/share/nginx/html/index.html 
-  systemctl enable nginx
-  systemctl start nginx
-  EOF
+  curl ifconfig me
 
   tags = {
     "Name" : "Kanye"
